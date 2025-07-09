@@ -15,7 +15,7 @@ import (
 )
 
 var (
-	Rest *sqlx.DB
+	Asset *sqlx.DB
 )
 
 type SSLMode string
@@ -36,7 +36,7 @@ func ConnectAndMigrate(host, port, databaseName, user, password string, sslMode 
 
 	logrus.Info("Connected to database")
 
-	Rest = DB
+	Asset = DB
 	return migrateUp(DB)
 }
 
@@ -61,7 +61,7 @@ func migrateUp(db *sqlx.DB) error {
 }
 
 func Tx(fn func(tx *sqlx.Tx) error) error {
-	tx, err := Rest.Beginx()
+	tx, err := Asset.Beginx()
 	if err != nil {
 		return fmt.Errorf("failed to start a transaction: %+v", err)
 	}
