@@ -150,3 +150,117 @@ func CreateAsset(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to encode response", http.StatusInternalServerError)
 	}
 }
+
+//
+//func ListAllAssets(w http.ResponseWriter, r *http.Request) {
+//	pageStr := r.URL.Query().Get("page")
+//	limitStr := r.URL.Query().Get("limit")
+//
+//	page, err := strconv.Atoi(pageStr)
+//	if err != nil || page < 1 {
+//		page = 1
+//	}
+//	limit, err := strconv.Atoi(limitStr)
+//	if err != nil || limit < 1 {
+//		limit = 10
+//	}
+//
+//	assets, err := dbHelper.ListAllAssets(page, limit)
+//	if err != nil {
+//		http.Error(w, "failed to list assets", http.StatusInternalServerError)
+//		return
+//	}
+//
+//	w.Header().Set("Content-Type", "application/json")
+//	if err := utils.JSON.NewEncoder(w).Encode(map[string]interface{}{
+//		"assets": assets,
+//	}); err != nil {
+//		http.Error(w, "failed to encode response", http.StatusInternalServerError)
+//	}
+//}
+
+func AssignAsset(w http.ResponseWriter, r *http.Request) {
+	var req models.AssignRequest
+	if err := utils.JSON.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+
+	claims, ok := utils.GetClaims(r)
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	tx, err := database.Asset.Beginx()
+	if err != nil {
+		http.Error(w, "could not begin transaction", http.StatusInternalServerError)
+		return
+	}
+
+	status, err := dbHelper.GetStatus(tx, req.AssetID)
+	if err != nil {
+		err = tx.Rollback()
+		if err != nil {
+			http.Error(w, "could not rollback transaction", http.StatusInternalServerError)
+		}
+		http.Error(w, "error fetching status", http.StatusInternalServerError)
+		return
+	}
+
+	if status != "available" {
+		err = tx.Rollback()
+		if err != nil {
+			http.Error(w, "could not rollback transaction", http.StatusInternalServerError)
+		}
+		http.Error(w, "asset is not available for assignment", http.StatusConflict)
+		return
+	}
+
+	req.PerformedBy = claims.UserID
+	err = dbHelper.AssignAsset(tx, req)
+	if err != nil {
+		err := tx.Rollback()
+		if err != nil {
+			http.Error(w, "could not rollback transaction", http.StatusInternalServerError)
+			return
+		}
+
+		http.Error(w, "failed to assign asset", http.StatusInternalServerError)
+		return
+	}
+
+	err = dbHelper.InsertAssetHistory(tx, status, req)
+	if err != nil {
+		err := tx.Rollback()
+		if err != nil {
+			http.Error(w, "could not rollback transaction", http.StatusInternalServerError)
+			return
+		}
+		http.Error(w, "failed to insert into asset history", http.StatusInternalServerError)
+	}
+
+	err = dbHelper.UpdateAssetStatus(tx, req.AssetID, req.Status)
+	if err != nil {
+		err := tx.Rollback()
+		if err != nil {
+			http.Error(w, "could not rollback transaction", http.StatusInternalServerError)
+			return
+		}
+		http.Error(w, "failed to update asset status", http.StatusInternalServerError)
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		http.Error(w, "failed to commit transaction", http.StatusInternalServerError)
+	}
+
+	err = utils.JSON.NewEncoder(w).Encode(map[string]string{
+		"message": "asset assigned",
+	})
+
+	if err != nil {
+		http.Error(w, "failed to encode response", http.StatusInternalServerError)
+		return
+	}
+}
