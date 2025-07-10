@@ -264,3 +264,83 @@ func AssignAsset(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 }
+
+func ChangeAssetStatus(w http.ResponseWriter, r *http.Request) {
+	var req models.ChangeAssetStatusRequest
+	err := utils.JSON.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		http.Error(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+
+	claims, ok := utils.GetClaims(r)
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	tx, err := database.Asset.Beginx()
+	if err != nil {
+		http.Error(w, "could not begin transaction", http.StatusInternalServerError)
+		return
+	}
+
+	status, err := dbHelper.GetStatus(tx, req.AssetID)
+	if err != nil {
+		err = tx.Rollback()
+		if err != nil {
+			http.Error(w, "could not rollback transaction", http.StatusInternalServerError)
+		}
+		http.Error(w, "error fetching status", http.StatusInternalServerError)
+		return
+	}
+
+	if status == "assigned" {
+		err = tx.Rollback()
+		if err != nil {
+			http.Error(w, "could not rollback transaction", http.StatusInternalServerError)
+			return
+		}
+		http.Error(w, "asset is already assigned please retrieve it", http.StatusConflict)
+		return
+	}
+
+	req.PerformedBy = claims.UserID
+	req.EmployeeID = ""
+
+	err = dbHelper.InsertAssetHistory(tx, status, req)
+	if err != nil {
+		err := tx.Rollback()
+		if err != nil {
+			http.Error(w, "could not rollback transaction", http.StatusInternalServerError)
+			return
+		}
+		log.Println("Error inserting asset history:", err)
+		http.Error(w, "failed to insert into asset history", http.StatusInternalServerError)
+		return
+	}
+
+	err = dbHelper.UpdateAssetStatus(tx, req.AssetID, req.Status)
+	if err != nil {
+		err := tx.Rollback()
+		if err != nil {
+			http.Error(w, "could not rollback transaction", http.StatusInternalServerError)
+			return
+		}
+		http.Error(w, "failed to update asset status", http.StatusInternalServerError)
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		http.Error(w, "failed to commit transaction", http.StatusInternalServerError)
+	}
+
+	err = utils.JSON.NewEncoder(w).Encode(map[string]string{
+		"message": "asset status changed",
+	})
+
+	if err != nil {
+		http.Error(w, "failed to encode response", http.StatusInternalServerError)
+		return
+	}
+}
