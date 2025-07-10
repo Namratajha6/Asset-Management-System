@@ -17,3 +17,10 @@ type Employee struct {
 	Role      string `json:"role" db:"role"`
 	CreatedBy string `json:"createdBy" db:"created_by"`
 }
+
+type AssignRequest struct {
+	EmployeeID  string `json:"employeeId" db:"employee_id"`
+	AssetID     string `json:"assetId" db:"asset_id"`
+	Status      string `json:"status" db:"status"`
+	PerformedBy string `json:"performedBy" db:"performed_by"`
+}
