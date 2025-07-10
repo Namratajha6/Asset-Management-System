@@ -117,3 +117,49 @@ func InsertAssetHistory(tx *sqlx.Tx, assetID, newStatus, performedBy string) err
 	`, assetID, newStatus, performedBy)
 	return err
 }
+
+func InsertAssetHistory(tx *sqlx.Tx, oldStatus string, req models.AssignRequest) error {
+	_, err := tx.Exec(`
+		INSERT INTO asset_history (employee_id, asset_id, old_status, new_status, performed_by)
+		VALUES ($1, $2, $3, $4, $5)
+	`, req.EmployeeID, req.AssetID, oldStatus, req.Status, req.PerformedBy)
+	return err
+}
+
+func GetStatus(tx *sqlx.Tx, assetID string) (string, error) {
+	var status string
+	err := tx.Get(&status, `SELECT asset_status FROM assets WHERE id = $1`, assetID)
+	if err != nil {
+		return "", err
+	}
+	return status, nil
+}
+
+func UpdateAssetStatus(tx *sqlx.Tx, assetID, newStatus string) error {
+	_, err := tx.Exec(`
+		UPDATE assets
+		SET asset_status = $1
+		WHERE id = $2
+	`, newStatus, assetID)
+	return err
+}
+
+func AssignAsset(tx *sqlx.Tx, assign models.AssignRequest) error {
+	_, err := tx.NamedExec(`
+			INSERT INTO asset_employee_history(employee_id, asset_id, status, performed_by)
+			VALUES (:employee_id, :asset_id, :status, :performed_by)`, &assign)
+	return err
+}
+
+func ListAllAssets(page int, limit int) ([]models.AssetResponse, error) {
+	const query = `
+		SELECT a.brand, a.model, a.asset_type, a.asset_status, a.serial_no, a.owned_by, a.purchased_date
+		FROM assets a
+		JOIN asset_history ur ON a.id = ah.asset_id
+		WHERE ur.role_type = 'sub_admin' AND u.archived_at IS NULL
+		LIMIT $1 OFFSET $2;`
+
+	assets := make([]models.AssetResponse, 0)
+	err := database.Asset.Select(&assets, query, limit, (page-1)*limit)
+	return assets, err
+}
