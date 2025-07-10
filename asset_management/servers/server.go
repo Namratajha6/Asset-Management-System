@@ -29,6 +29,9 @@ func SetupRoutes() http.Handler {
 
 	roleProtected := protected.NewRoute().Subrouter()
 	roleProtected.Use(middleware.RoleMiddleware("admin", "asset_manager"))
+	roleProtected.HandleFunc("/admin/asset", handlers.CreateAsset).Methods("POST")
+
+	roleProtected.Use(middleware.RoleMiddleware("admin", "employee_manager"))
 	roleProtected.HandleFunc("/admin/employee", handlers.CreateEmployee).Methods("POST")
 
 	return r

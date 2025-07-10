@@ -65,7 +65,7 @@ func CreateEmployeeByEmployee(w http.ResponseWriter, r *http.Request) {
 }
 
 func CreateEmployee(w http.ResponseWriter, r *http.Request) {
-	var req models.EmployeeReq
+	var req models.Employee
 	if err := utils.JSON.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
@@ -98,16 +98,9 @@ func CreateEmployee(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	employee := models.Employee{
-		Name:      req.Name,
-		Email:     req.Email,
-		PhoneNo:   req.PhoneNo,
-		Role:      req.Role,
-		Type:      req.Type,
-		CreatedBy: claims.UserID,
-	}
+	req.CreatedBy = claims.UserID
 
-	err = dbHelper.CreateEmployee(employee)
+	err = dbHelper.CreateEmployee(req)
 	if err != nil {
 		fmt.Println(err)
 		http.Error(w, "failed to create employee", http.StatusInternalServerError)
