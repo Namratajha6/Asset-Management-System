@@ -265,6 +265,95 @@ func AssignAsset(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func RetrieveAsset(w http.ResponseWriter, r *http.Request) {
+	var req models.ChangeAssetStatusRequest
+
+	if err := utils.JSON.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+
+	claims, ok := utils.GetClaims(r)
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	tx, err := database.Asset.Beginx()
+	if err != nil {
+		http.Error(w, "could not begin transaction", http.StatusInternalServerError)
+		return
+	}
+
+	status, err := dbHelper.GetStatus(tx, req.AssetID)
+	if err != nil {
+		err = tx.Rollback()
+		if err != nil {
+			http.Error(w, "could not rollback transaction", http.StatusInternalServerError)
+		}
+		http.Error(w, "error fetching status", http.StatusInternalServerError)
+		return
+	}
+
+	if status != "assigned" {
+		err = tx.Rollback()
+		if err != nil {
+			http.Error(w, "could not rollback transaction", http.StatusInternalServerError)
+		}
+		http.Error(w, "asset is not assigned to anyone", http.StatusConflict)
+		return
+	}
+
+	req.PerformedBy = claims.UserID
+	err = dbHelper.RetrieveAsset(tx, req)
+	log.Println("Error assigning asset:", err)
+	if err != nil {
+		err := tx.Rollback()
+		if err != nil {
+			http.Error(w, "could not rollback transaction", http.StatusInternalServerError)
+			return
+		}
+		http.Error(w, "failed to assign asset", http.StatusInternalServerError)
+		return
+	}
+
+	req.Status = "available"
+
+	err = dbHelper.InsertAssetHistory(tx, status, req)
+	if err != nil {
+		err := tx.Rollback()
+		if err != nil {
+			http.Error(w, "could not rollback transaction", http.StatusInternalServerError)
+			return
+		}
+		http.Error(w, "failed to insert into asset history", http.StatusInternalServerError)
+	}
+
+	err = dbHelper.UpdateAssetStatus(tx, req.AssetID, req.Status)
+	if err != nil {
+		err := tx.Rollback()
+		if err != nil {
+			http.Error(w, "could not rollback transaction", http.StatusInternalServerError)
+			return
+		}
+		http.Error(w, "failed to update asset status", http.StatusInternalServerError)
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		http.Error(w, "failed to commit transaction", http.StatusInternalServerError)
+	}
+
+	err = utils.JSON.NewEncoder(w).Encode(map[string]string{
+		"message": "asset retrieved",
+	})
+
+	if err != nil {
+		http.Error(w, "failed to encode response", http.StatusInternalServerError)
+		return
+	}
+}
+
 func ChangeAssetStatus(w http.ResponseWriter, r *http.Request) {
 	var req models.ChangeAssetStatusRequest
 	err := utils.JSON.NewDecoder(r.Body).Decode(&req)
