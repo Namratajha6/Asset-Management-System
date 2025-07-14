@@ -1,6 +1,8 @@
 package models
 
-import "time"
+import (
+	"time"
+)
 
 type AssetRequest struct {
 	Brand             string    `json:"brand"`
@@ -26,18 +28,46 @@ type AssetRequest struct {
 	UpdatedBy         string    `json:"updatedBy"`
 }
 
-type Asset struct {
-	Brand             string    `json:"brand" db:"brand"`
-	Model             string    `json:"model" db:"model"`
-	SerialNo          string    `json:"serialNo" db:"serial_no"`
-	AssetType         string    `json:"assetType" db:"asset_type"`
-	AssetStatus       string    `json:"assetStatus" db:"asset_status"`
-	OwnedBy           string    `json:"ownedBy" db:"owned_by"`
-	PurchasedDate     time.Time `json:"purchasedDate" db:"purchased_date"`
-	WarrantyStartDate time.Time `json:"warrantyStartDate" db:"warranty_start_date"`
-	WarrantyEndDate   time.Time `json:"warrantyEndDate" db:"warranty_end_date"`
-	CreatedBy         string    `json:"createdBy" db:"created_by"`
-	UpdatedBy         string    `json:"updatedBy" db:"updated_by"`
+type AssetResponse struct {
+	Brand         string    `json:"brand" db:"brand"`
+	Model         string    `json:"model" db:"model"`
+	SerialNo      string    `json:"serialNo" db:"serial_no"`
+	AssetType     string    `json:"assetType" db:"asset_type"`
+	AssetStatus   string    `json:"assetStatus" db:"asset_status"`
+	OwnedBy       string    `json:"ownedBy" db:"owned_by"`
+	PurchasedDate time.Time `json:"purchasedDate" db:"purchased_date"`
+	AssignedTo    *string   `json:"assignedTo" db:"employee_id"`
+}
+
+type AssetTimelineResponse struct {
+	EmployeeName *string    `json:"employeeName" db:"employee_name"` // nullable
+	Status       *string    `json:"status" db:"status"`              // assigned/retrieved/etc.
+	AssignedDate *time.Time `json:"assignedDate" db:"assigned_date"` // nullable
+	ReturnDate   *time.Time `json:"returnDate" db:"return_date"`     // nullable
+	PerformedAt  time.Time  `json:"performedAt" db:"performed_at"`   // not null
+	PerformedBy  string     `json:"performedBy" db:"performed_by"`   // who performed action
+}
+
+type AssetDetailsResponse struct {
+	ID                string     `json:"id"                db:"id"`
+	Brand             string     `json:"brand"             db:"brand"`
+	Model             string     `json:"model"             db:"model"`
+	SerialNo          string     `json:"serialNo"          db:"serial_no"`
+	AssetType         string     `json:"assetType"         db:"asset_type"`
+	AssetStatus       string     `json:"assetStatus"       db:"asset_status"`
+	OwnedBy           string     `json:"ownedBy"           db:"owned_by"`
+	PurchasedDate     *time.Time `json:"purchasedDate"     db:"purchased_date"`
+	WarrantyStartDate *time.Time `json:"warrantyStartDate" db:"warranty_start_date"`
+	WarrantyEndDate   *time.Time `json:"warrantyEndDate"   db:"warranty_end_date"`
+	EmployeeID        *string    `json:"employeeId"   db:"employee_id"`
+	EmployeeName      *string    `json:"employeeName" db:"employee_name"`
+}
+
+type ChangeAssetStatusRequest struct {
+	EmployeeID  string `json:"employeeId" db:"employee_id"`
+	AssetID     string `json:"assetId" db:"asset_id"`
+	Status      string `json:"status" db:"status"`
+	PerformedBy string `json:"performedBy" db:"performed_by"`
 }
 
 type Laptop struct {

@@ -110,7 +110,7 @@ func InsertSIM(tx *sqlx.Tx, sim models.SIM) error {
 	return nil
 }
 
-func InsertAssetHistory(tx *sqlx.Tx, assetID, newStatus, performedBy string) error {
+func CreateAssetHistory(tx *sqlx.Tx, assetID, newStatus, performedBy string) error {
 	_, err := tx.Exec(`
 		INSERT INTO asset_history (asset_id, old_status, new_status, performed_by)
 		VALUES ($1, NULL, $2, $3)
@@ -118,12 +118,18 @@ func InsertAssetHistory(tx *sqlx.Tx, assetID, newStatus, performedBy string) err
 	return err
 }
 
-func InsertAssetHistory(tx *sqlx.Tx, oldStatus string, req models.AssignRequest) error {
+func InsertAssetHistory(tx *sqlx.Tx, oldStatus string, req models.ChangeAssetStatusRequest) error {
+	var employeeID interface{} = nil
+	if req.EmployeeID != "" {
+		employeeID = req.EmployeeID
+	}
+
 	_, err := tx.Exec(`
-		INSERT INTO asset_history (employee_id, asset_id, old_status, new_status, performed_by)
-		VALUES ($1, $2, $3, $4, $5)
-	`, req.EmployeeID, req.AssetID, oldStatus, req.Status, req.PerformedBy)
+	INSERT INTO asset_history (employee_id, asset_id, old_status, new_status, performed_by)
+	VALUES ($1, $2, $3, $4, $5)
+	`, employeeID, req.AssetID, oldStatus, req.Status, req.PerformedBy)
 	return err
+
 }
 
 func GetStatus(tx *sqlx.Tx, assetID string) (string, error) {
@@ -144,22 +150,120 @@ func UpdateAssetStatus(tx *sqlx.Tx, assetID, newStatus string) error {
 	return err
 }
 
-func AssignAsset(tx *sqlx.Tx, assign models.AssignRequest) error {
+func AssignAsset(tx *sqlx.Tx, assign models.ChangeAssetStatusRequest) error {
 	_, err := tx.NamedExec(`
-			INSERT INTO asset_employee_history(employee_id, asset_id, status, performed_by)
-			VALUES (:employee_id, :asset_id, :status, :performed_by)`, &assign)
+			INSERT INTO asset_employee_history(employee_id, asset_id, status, performed_by, assigned_date)
+			VALUES (:employee_id, :asset_id, :status, :performed_by, now())`, &assign)
 	return err
 }
 
-func ListAllAssets(page int, limit int) ([]models.AssetResponse, error) {
+func RetrieveAsset(tx *sqlx.Tx, assign models.ChangeAssetStatusRequest) error {
+	res, err := tx.Exec(`
+		UPDATE asset_employee_history
+		SET    status      = 'retrieved',
+		       return_date = NOW(),
+		       updated_by  = $1
+		WHERE  asset_id = $2
+		  AND  status   = 'assigned'
+		  AND  return_date IS NULL
+	`, assign.PerformedBy, assign.AssetID)
+	if err != nil {
+		return err
+	}
+
+	rows, _ := res.RowsAffected()
+	if rows == 0 {
+		return fmt.Errorf("no open assignment to retrieve")
+	}
+	return nil
+
+}
+
+func ListAllAssets(page, limit int) ([]models.AssetResponse, error) {
 	const query = `
-		SELECT a.brand, a.model, a.asset_type, a.asset_status, a.serial_no, a.owned_by, a.purchased_date
+		SELECT
+			a.brand,
+			a.model,
+			a.asset_type,
+			a.asset_status,
+			a.serial_no,
+			a.owned_by,
+			a.purchased_date,
+			h.employee_id                 
 		FROM assets a
-		JOIN asset_history ur ON a.id = ah.asset_id
-		WHERE ur.role_type = 'sub_admin' AND u.archived_at IS NULL
-		LIMIT $1 OFFSET $2;`
+		LEFT JOIN asset_employee_history h             
+		       ON h.asset_id   = a.id
+		      AND h.status     = 'assigned'
+		      AND h.return_date IS NULL
+		WHERE a.archived_at IS NULL
+		ORDER BY 
+			  CASE WHEN a.asset_status = 'assigned' THEN 0 ELSE 1 END,
+			  a.created_at DESC                                         
+		LIMIT  $1
+		OFFSET $2;
+	`
 
 	assets := make([]models.AssetResponse, 0)
 	err := database.Asset.Select(&assets, query, limit, (page-1)*limit)
 	return assets, err
+}
+
+func AssetTimeline(assetID string) ([]models.AssetTimelineResponse, error) {
+	const query = `
+		SELECT 
+			e.name AS employee_name,
+			h.status ,
+			h.assigned_date,
+			h.return_date,
+			h.performed_at,
+			h.performed_by
+		FROM asset_employee_history h
+		LEFT JOIN employees e ON h.employee_id = e.id
+		WHERE h.asset_id = $1
+		ORDER BY h.performed_at DESC;
+	`
+
+	var timeline []models.AssetTimelineResponse
+	err := database.Asset.Select(&timeline, query, assetID)
+	return timeline, err
+}
+
+func AssetDetails(assetID string) (models.AssetDetailsResponse, error) {
+	const q = `
+		SELECT
+			a.id,
+			a.brand,
+			a.model,
+			a.serial_no,
+			a.asset_type,
+			a.asset_status,
+			a.owned_by,
+			a.purchased_date,
+			a.warranty_start_date,
+			a.warranty_end_date,
+
+			ass.employee_id,
+			e.name AS employee_name
+		FROM assets a
+
+		LEFT JOIN LATERAL (
+			SELECT h.employee_id
+			FROM   asset_employee_history h
+			WHERE  h.asset_id   = a.id
+			  AND  h.status     = 'assigned'
+			  AND  h.return_date IS NULL
+			ORDER BY h.performed_at DESC     
+			LIMIT 1
+		) ass ON TRUE
+
+		LEFT JOIN employees e ON e.id = ass.employee_id
+
+		WHERE a.id = $1
+		LIMIT 1;
+	`
+
+	var out models.AssetDetailsResponse
+	err := database.Asset.Get(&out, q, assetID)
+	return out, err
+
 }

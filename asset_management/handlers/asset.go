@@ -7,6 +7,7 @@ import (
 	"asset_management/utils"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 )
 
@@ -53,6 +54,7 @@ func CreateAsset(w http.ResponseWriter, r *http.Request) {
 		err := tx.Rollback()
 		if err != nil {
 			http.Error(w, "could not rollback transaction", http.StatusInternalServerError)
+			return
 		}
 
 		http.Error(w, "failed to insert asset", http.StatusInternalServerError)
@@ -130,7 +132,7 @@ func CreateAsset(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = dbHelper.InsertAssetHistory(tx, assetID, req.AssetStatus, req.CreatedBy)
+	err = dbHelper.CreateAssetHistory(tx, assetID, req.AssetStatus, req.CreatedBy)
 	if err != nil {
 		_ = tx.Rollback()
 		log.Println("Error inserting asset history:", err)
@@ -148,39 +150,13 @@ func CreateAsset(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		http.Error(w, "failed to encode response", http.StatusInternalServerError)
+		return
 	}
 }
 
-//
-//func ListAllAssets(w http.ResponseWriter, r *http.Request) {
-//	pageStr := r.URL.Query().Get("page")
-//	limitStr := r.URL.Query().Get("limit")
-//
-//	page, err := strconv.Atoi(pageStr)
-//	if err != nil || page < 1 {
-//		page = 1
-//	}
-//	limit, err := strconv.Atoi(limitStr)
-//	if err != nil || limit < 1 {
-//		limit = 10
-//	}
-//
-//	assets, err := dbHelper.ListAllAssets(page, limit)
-//	if err != nil {
-//		http.Error(w, "failed to list assets", http.StatusInternalServerError)
-//		return
-//	}
-//
-//	w.Header().Set("Content-Type", "application/json")
-//	if err := utils.JSON.NewEncoder(w).Encode(map[string]interface{}{
-//		"assets": assets,
-//	}); err != nil {
-//		http.Error(w, "failed to encode response", http.StatusInternalServerError)
-//	}
-//}
-
 func AssignAsset(w http.ResponseWriter, r *http.Request) {
-	var req models.AssignRequest
+	var req models.ChangeAssetStatusRequest
+
 	if err := utils.JSON.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid request", http.StatusBadRequest)
 		return
@@ -219,13 +195,13 @@ func AssignAsset(w http.ResponseWriter, r *http.Request) {
 
 	req.PerformedBy = claims.UserID
 	err = dbHelper.AssignAsset(tx, req)
+	log.Println("Error assigning asset:", err)
 	if err != nil {
 		err := tx.Rollback()
 		if err != nil {
 			http.Error(w, "could not rollback transaction", http.StatusInternalServerError)
 			return
 		}
-
 		http.Error(w, "failed to assign asset", http.StatusInternalServerError)
 		return
 	}
@@ -238,6 +214,7 @@ func AssignAsset(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		http.Error(w, "failed to insert into asset history", http.StatusInternalServerError)
+		return
 	}
 
 	err = dbHelper.UpdateAssetStatus(tx, req.AssetID, req.Status)
@@ -248,11 +225,13 @@ func AssignAsset(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		http.Error(w, "failed to update asset status", http.StatusInternalServerError)
+		return
 	}
 
 	err = tx.Commit()
 	if err != nil {
 		http.Error(w, "failed to commit transaction", http.StatusInternalServerError)
+		return
 	}
 
 	err = utils.JSON.NewEncoder(w).Encode(map[string]string{
@@ -327,6 +306,7 @@ func RetrieveAsset(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		http.Error(w, "failed to insert into asset history", http.StatusInternalServerError)
+		return
 	}
 
 	err = dbHelper.UpdateAssetStatus(tx, req.AssetID, req.Status)
@@ -337,6 +317,7 @@ func RetrieveAsset(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		http.Error(w, "failed to update asset status", http.StatusInternalServerError)
+		return
 	}
 
 	err = tx.Commit()
@@ -417,11 +398,13 @@ func ChangeAssetStatus(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		http.Error(w, "failed to update asset status", http.StatusInternalServerError)
+		return
 	}
 
 	err = tx.Commit()
 	if err != nil {
 		http.Error(w, "failed to commit transaction", http.StatusInternalServerError)
+		return
 	}
 
 	err = utils.JSON.NewEncoder(w).Encode(map[string]string{
@@ -432,4 +415,66 @@ func ChangeAssetStatus(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to encode response", http.StatusInternalServerError)
 		return
 	}
+}
+
+func ListAllAssets(w http.ResponseWriter, r *http.Request) {
+	pageStr := r.URL.Query().Get("page")
+	limitStr := r.URL.Query().Get("limit")
+
+	page, err := strconv.Atoi(pageStr)
+	if err != nil || page < 1 {
+		page = 1
+	}
+	limit, err := strconv.Atoi(limitStr)
+	if err != nil || limit < 1 {
+		limit = 10
+	}
+
+	assets, err := dbHelper.ListAllAssets(page, limit)
+	if err != nil {
+		log.Println(err)
+		http.Error(w, "failed to list assets", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := utils.JSON.NewEncoder(w).Encode(map[string]interface{}{
+		"assets": assets,
+	}); err != nil {
+		http.Error(w, "failed to encode response", http.StatusInternalServerError)
+	}
+}
+
+func AssetDetails(w http.ResponseWriter, r *http.Request) {
+	assetID := r.URL.Query().Get("id")
+	if assetID == "" {
+		http.Error(w, "assetId is required", http.StatusBadRequest)
+		return
+	}
+
+	asset, err := dbHelper.AssetDetails(assetID)
+	if err != nil {
+		http.Error(w, "failed to fetch asset", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = utils.JSON.NewEncoder(w).Encode(asset)
+}
+
+func AssetTimeline(w http.ResponseWriter, r *http.Request) {
+	assetID := r.URL.Query().Get("id")
+	if assetID == "" {
+		http.Error(w, "assetId is required", http.StatusBadRequest)
+		return
+	}
+
+	timeline, err := dbHelper.AssetTimeline(assetID)
+	if err != nil {
+		http.Error(w, "failed to fetch asset timeline", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = utils.JSON.NewEncoder(w).Encode(timeline)
 }

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 )
 
 func CreateEmployeeByEmployee(w http.ResponseWriter, r *http.Request) {
@@ -158,4 +159,66 @@ func Login(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to encode response", http.StatusInternalServerError)
 		return
 	}
+}
+
+func ListAllEmployees(w http.ResponseWriter, r *http.Request) {
+	page, limit := parsePageLimit(r)
+	employees, err := dbHelper.ListAllEmployees(page, limit)
+	if err != nil {
+		log.Println(err)
+		http.Error(w, "failed to list employees", http.StatusInternalServerError)
+		return
+	}
+	respondJSON(w, map[string]any{"employees": employees})
+}
+
+func EmployeeDetails(w http.ResponseWriter, r *http.Request) {
+	employeeID := r.URL.Query().Get("id")
+	if employeeID == "" {
+		http.Error(w, "employeeId is required", http.StatusBadRequest)
+		return
+	}
+
+	info, assets, err := dbHelper.EmployeeDetails(employeeID)
+	if err != nil {
+		log.Println(err)
+		http.Error(w, "failed to fetch employee details", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = utils.JSON.NewEncoder(w).Encode(map[string]interface{}{
+		"employee": info,
+		"assets":   assets,
+	})
+}
+
+func EmployeeTimeline(w http.ResponseWriter, r *http.Request) {
+	empID := r.URL.Query().Get("id")
+	if empID == "" {
+		http.Error(w, "employeeId is required", http.StatusBadRequest)
+		return
+	}
+	timeline, err := dbHelper.EmployeeTimeline(empID)
+	if err != nil {
+		http.Error(w, "failed to fetch employee timeline", http.StatusInternalServerError)
+		return
+	}
+	respondJSON(w, timeline)
+}
+
+func parsePageLimit(r *http.Request) (int, int) {
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 {
+		limit = 10
+	}
+	return page, limit
+}
+
+func respondJSON(w http.ResponseWriter, v any) {
+	w.Header().Set("Content-Type", "application/json")
+	_ = utils.JSON.NewEncoder(w).Encode(v)
 }

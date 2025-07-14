@@ -26,13 +26,25 @@ func SetupRoutes() http.Handler {
 
 	protected := r.PathPrefix("/api/v1").Subrouter()
 	protected.Use(middleware.AuthMiddleware)
+	protected.HandleFunc("/dashboard/employee", handlers.EmployeeDashboard).Methods("GET")
 
-	roleProtected := protected.NewRoute().Subrouter()
-	roleProtected.Use(middleware.RoleMiddleware("admin", "asset_manager"))
-	roleProtected.HandleFunc("/admin/asset", handlers.CreateAsset).Methods("POST")
+	roleAssetProtected := protected.NewRoute().Subrouter()
+	roleAssetProtected.Use(middleware.RoleMiddleware("admin", "asset_manager"))
+	roleAssetProtected.HandleFunc("/admin/dashboard/asset", handlers.AssetStats).Methods("GET")
+	roleAssetProtected.HandleFunc("/admin/asset", handlers.CreateAsset).Methods("POST")
+	roleAssetProtected.HandleFunc("/admin/asset", handlers.AssetDetails).Methods("GET")
+	roleAssetProtected.HandleFunc("/admin/assets", handlers.ListAllAssets).Methods("GET")
+	roleAssetProtected.HandleFunc("/admin/assign/asset", handlers.AssignAsset).Methods("POST")
+	roleAssetProtected.HandleFunc("/admin/retrieve/asset", handlers.RetrieveAsset).Methods("POST")
+	roleAssetProtected.HandleFunc("/admin/asset/status", handlers.ChangeAssetStatus).Methods("POST")
+	roleAssetProtected.HandleFunc("/admin/asset/timeline", handlers.AssetTimeline).Methods("GET")
 
-	roleProtected.Use(middleware.RoleMiddleware("admin", "employee_manager"))
-	roleProtected.HandleFunc("/admin/employee", handlers.CreateEmployee).Methods("POST")
+	roleEmployeeProtected := protected.NewRoute().Subrouter()
+	roleEmployeeProtected.Use(middleware.RoleMiddleware("admin", "employee_manager"))
+	roleEmployeeProtected.HandleFunc("/admin/employee", handlers.CreateEmployee).Methods("POST")
+	roleEmployeeProtected.HandleFunc("/admin/employee", handlers.EmployeeDetails).Methods("GET")
+	roleEmployeeProtected.HandleFunc("/admin/employees", handlers.ListAllEmployees).Methods("GET")
+	roleEmployeeProtected.HandleFunc("/admin/employee/timeline", handlers.EmployeeTimeline).Methods("GET")
 
 	return r
 }
