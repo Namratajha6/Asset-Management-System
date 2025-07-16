@@ -126,8 +126,8 @@ CREATE TABLE IF NOT EXISTS asset_history (
 );
 
 CREATE INDEX IF NOT EXISTS idx_employees_email ON employees(email) WHERE archived_at IS NULL;
-CREATE INDEX IF NOT EXISTS idx_assets_type_status
-    ON assets(asset_type, asset_status, brand);
+CREATE INDEX IF NOT EXISTS idx_asset_emp_history_asset_id ON asset_employee_history(asset_id);
+CREATE INDEX IF NOT EXISTS idx_asset_emp_history_employee_id ON asset_employee_history(employee_id);
 
 CREATE INDEX IF NOT EXISTS idx_asset_employee_performed_at
     ON asset_employee_history(asset_id, performed_at DESC);
