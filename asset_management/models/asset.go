@@ -5,30 +5,30 @@ import (
 )
 
 type AssetRequest struct {
-	Brand             string    `json:"brand"`
-	Model             string    `json:"model"`
-	SerialNo          string    `json:"serialNo"`
-	AssetType         string    `json:"assetType"`
-	AssetStatus       string    `json:"assetStatus"`
-	OwnedBy           string    `json:"ownedBy"`
-	PurchasedDate     time.Time `json:"purchasedDate"`
-	WarrantyStartDate time.Time `json:"warrantyStartDate"`
-	WarrantyEndDate   time.Time `json:"warrantyEndDate"`
-	OS                string    `json:"os"`
-	RAM               string    `json:"ram"`
-	Storage           string    `json:"storage"`
-	Processor         string    `json:"processor"`
-	ConnectivityType  string    `json:"connectivityType"`
-	StorageCapacity   string    `json:"storageCapacity"`
-	IMEI1             string    `json:"imei1"`
-	IMEI2             string    `json:"imei2"`
-	MobileNumber      string    `json:"mobileNumber"`
-	NetworkProvider   string    `json:"networkProvider"`
-	CreatedBy         string    `json:"createdBy"`
-	UpdatedBy         string    `json:"updatedBy"`
+	Brand             string `json:"brand"`
+	Model             string `json:"model"`
+	SerialNo          string `json:"serialNo"`
+	AssetType         string `json:"assetType"`
+	AssetStatus       string `json:"assetStatus"`
+	OwnedBy           string `json:"ownedBy"`
+	PurchasedDate     string `json:"purchasedDate"`
+	WarrantyStartDate string `json:"warrantyStartDate"`
+	WarrantyEndDate   string `json:"warrantyEndDate"`
+	OS                string `json:"os"`
+	RAM               string `json:"ram"`
+	Storage           string `json:"storage"`
+	Processor         string `json:"processor"`
+	ConnectivityType  string `json:"connectivityType"`
+	StorageCapacity   string `json:"storageCapacity"`
+	IMEI1             string `json:"imei1"`
+	IMEI2             string `json:"imei2"`
+	MobileNumber      string `json:"mobileNumber"`
+	NetworkProvider   string `json:"networkProvider"`
+	CreatedBy         string `json:"createdBy"`
+	UpdatedBy         string `json:"updatedBy"`
 }
 
-type AssetResponse struct {
+type AssetsResponse struct {
 	Brand         string    `json:"brand" db:"brand"`
 	Model         string    `json:"model" db:"model"`
 	SerialNo      string    `json:"serialNo" db:"serial_no"`
@@ -136,4 +136,21 @@ type SIM struct {
 	ArchivedAt      *time.Time `json:"archivedAt" db:"archived_at"`
 	CreatedBy       string     `json:"createdBy" db:"created_by"`
 	UpdatedBy       string     `json:"updatedBy" db:"updated_by"`
+}
+
+type AssetSearchResponse struct {
+	Brand         string `json:"brand"`
+	Model         string `json:"model"`
+	AssetType     string `json:"assetType" db:"asset_type"`
+	SerialNo      string `json:"serialNo" db:"serial_no"`
+	AssetStatus   string `json:"assetStatus" db:"asset_status"`
+	OwnedBy       string `json:"ownedBt" db:"owned_by"`
+	PurchasedDate string `json:"purchasedDate" db:"purchased_date"`
+}
+
+type ListAssets struct {
+	SearchText  string   `json:"searchText"`
+	AssetTypes  []string `json:"assetTypes"`
+	AssetStatus []string `json:"assetStatus"`
+	OwnedBy     string   `json:"ownedBy"`
 }

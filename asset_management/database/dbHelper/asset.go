@@ -6,6 +6,9 @@ import (
 	"database/sql"
 	"fmt"
 	"github.com/jmoiron/sqlx"
+	"github.com/lib/pq"
+	"log"
+	"strings"
 )
 
 func IsAssetExists(serialNo string) (bool, error) {
@@ -132,6 +135,16 @@ func InsertAssetHistory(tx *sqlx.Tx, oldStatus string, req models.ChangeAssetSta
 
 }
 
+func GetStatusByEmpID(tx *sqlx.Tx, empID string) (string, error) {
+	var status string
+	err := tx.Get(&status, `SELECT status FROM asset_employee_history WHERE id = $1`, empID)
+	log.Println(status)
+	if err != nil {
+		log.Println(status)
+	}
+	return status, nil
+}
+
 func GetStatus(tx *sqlx.Tx, assetID string) (string, error) {
 	var status string
 	err := tx.Get(&status, `SELECT asset_status FROM assets WHERE id = $1`, assetID)
@@ -179,7 +192,7 @@ func RetrieveAsset(tx *sqlx.Tx, assign models.ChangeAssetStatusRequest) error {
 
 }
 
-func ListAllAssets(page, limit int) ([]models.AssetResponse, error) {
+func ListAllAssets(page, limit int) ([]models.AssetsResponse, error) {
 	const query = `
 		SELECT
 			a.brand,
@@ -203,8 +216,67 @@ func ListAllAssets(page, limit int) ([]models.AssetResponse, error) {
 		OFFSET $2;
 	`
 
-	assets := make([]models.AssetResponse, 0)
+	assets := make([]models.AssetsResponse, 0)
 	err := database.Asset.Select(&assets, query, limit, (page-1)*limit)
+	return assets, err
+}
+
+func ListAssets(filter models.ListAssets, page, limit int) ([]models.AssetsResponse, error) {
+	query := `
+		SELECT
+			a.brand,
+			a.model,
+			a.asset_type,
+			a.asset_status,
+			a.serial_no,
+			a.owned_by,
+			a.purchased_date,
+			h.employee_id
+		FROM assets a
+		LEFT JOIN asset_employee_history h
+		       ON h.asset_id   = a.id
+		      AND h.status     = 'assigned'
+		      AND h.return_date IS NULL
+		WHERE a.archived_at IS NULL
+	`
+
+	idx := 1
+	args := []any{}
+
+	if s := strings.TrimSpace(filter.SearchText); s != "" {
+		pattern := "%" + s + "%"
+		query += fmt.Sprintf(` AND (a.brand ILIKE $%d OR a.model ILIKE $%d)`, idx, idx)
+		args = append(args, pattern)
+		idx++
+	}
+
+	if len(filter.AssetTypes) > 0 {
+		query += fmt.Sprintf(" AND a.asset_type::text = ANY($%d)", idx)
+		args = append(args, pq.Array(filter.AssetTypes))
+		idx++
+	}
+
+	if len(filter.AssetStatus) > 0 {
+		query += fmt.Sprintf(" AND a.asset_status::text = ANY($%d)", idx)
+		args = append(args, pq.Array(filter.AssetStatus))
+		idx++
+	}
+
+	if len(filter.OwnedBy) > 0 {
+		query += fmt.Sprintf(" AND a.owned_by::text = ANY($%d)", idx)
+		args = append(args, pq.Array(filter.OwnedBy))
+		idx++
+	}
+
+	offset := (page - 1) * limit
+	query += fmt.Sprintf(" ORDER BY a.created_at DESC LIMIT $%d OFFSET $%d", idx, idx+1)
+	args = append(args, limit, offset)
+
+	log.Println("SQL :", query)
+	log.Println("ARGS:", args)
+
+	var assets []models.AssetsResponse
+	err := database.Asset.Select(&assets, query, args...)
 	return assets, err
 }
 
@@ -246,15 +318,12 @@ func AssetDetails(assetID string) (models.AssetDetailsResponse, error) {
 			e.name AS employee_name
 		FROM assets a
 
-		LEFT JOIN LATERAL (
-			SELECT h.employee_id
-			FROM   asset_employee_history h
-			WHERE  h.asset_id   = a.id
-			  AND  h.status     = 'assigned'
-			  AND  h.return_date IS NULL
-			ORDER BY h.performed_at DESC     
-			LIMIT 1
-		) ass ON TRUE
+		LEFT JOIN (
+			  SELECT DISTINCT ON (asset_id) asset_id, employee_id
+			  FROM asset_employee_history
+			  WHERE status = 'assigned' AND return_date IS NULL
+			  ORDER BY asset_id, performed_at DESC
+			) ass ON ass.asset_id = a.id
 
 		LEFT JOIN employees e ON e.id = ass.employee_id
 
@@ -266,4 +335,13 @@ func AssetDetails(assetID string) (models.AssetDetailsResponse, error) {
 	err := database.Asset.Get(&out, q, assetID)
 	return out, err
 
+}
+
+func ArchiveAsset(tx *sqlx.Tx, assetID string) error {
+	const q = `UPDATE assets
+		SET    archived_at = NOW()
+		WHERE  id = $1;
+		`
+	_, err := tx.Exec(q, assetID)
+	return err
 }

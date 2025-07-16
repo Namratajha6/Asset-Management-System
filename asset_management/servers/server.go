@@ -3,6 +3,7 @@ package server
 import (
 	"asset_management/handlers"
 	"asset_management/middleware"
+	"asset_management/models"
 	"encoding/json"
 	"net/http"
 
@@ -29,7 +30,7 @@ func SetupRoutes() http.Handler {
 	protected.HandleFunc("/dashboard/employee", handlers.EmployeeDashboard).Methods("GET")
 
 	roleAssetProtected := protected.NewRoute().Subrouter()
-	roleAssetProtected.Use(middleware.RoleMiddleware("admin", "asset_manager"))
+	roleAssetProtected.Use(middleware.RoleMiddleware(models.RoleAdmin, models.RoleAssetManager))
 	roleAssetProtected.HandleFunc("/admin/dashboard/asset", handlers.AssetStats).Methods("GET")
 	roleAssetProtected.HandleFunc("/admin/asset", handlers.CreateAsset).Methods("POST")
 	roleAssetProtected.HandleFunc("/admin/asset", handlers.AssetDetails).Methods("GET")
@@ -38,13 +39,15 @@ func SetupRoutes() http.Handler {
 	roleAssetProtected.HandleFunc("/admin/retrieve/asset", handlers.RetrieveAsset).Methods("POST")
 	roleAssetProtected.HandleFunc("/admin/asset/status", handlers.ChangeAssetStatus).Methods("POST")
 	roleAssetProtected.HandleFunc("/admin/asset/timeline", handlers.AssetTimeline).Methods("GET")
+	roleAssetProtected.HandleFunc("/admin/asset/archive", handlers.ArchiveAsset).Methods("DELETE")
 
 	roleEmployeeProtected := protected.NewRoute().Subrouter()
-	roleEmployeeProtected.Use(middleware.RoleMiddleware("admin", "employee_manager"))
+	roleEmployeeProtected.Use(middleware.RoleMiddleware(models.RoleAdmin, models.RoleEmployeeManager))
 	roleEmployeeProtected.HandleFunc("/admin/employee", handlers.CreateEmployee).Methods("POST")
 	roleEmployeeProtected.HandleFunc("/admin/employee", handlers.EmployeeDetails).Methods("GET")
-	roleEmployeeProtected.HandleFunc("/admin/employees", handlers.ListAllEmployees).Methods("GET")
+	roleEmployeeProtected.HandleFunc("/admin/employees", handlers.ListEmployees).Methods("GET")
 	roleEmployeeProtected.HandleFunc("/admin/employee/timeline", handlers.EmployeeTimeline).Methods("GET")
+	roleEmployeeProtected.HandleFunc("/admin/employee/archive", handlers.ArchiveEmployee).Methods("DELETE")
 
 	return r
 }

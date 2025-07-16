@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS assets (
 
 CREATE TABLE IF NOT EXISTS laptops (
                                        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                                       asset_id UUID UNIQUE REFERENCES assets(id) ON DELETE CASCADE,
+                                       asset_id UUID UNIQUE REFERENCES assets(id) ,
                                        os TEXT NOT NULL,
                                        ram TEXT NOT NULL,
                                        storage TEXT NOT NULL,
@@ -50,7 +50,7 @@ CREATE TABLE IF NOT EXISTS laptops (
 
 CREATE TABLE IF NOT EXISTS mouse (
                                      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                                     asset_id UUID UNIQUE REFERENCES assets(id) ON DELETE CASCADE,
+                                     asset_id UUID UNIQUE REFERENCES assets(id) ,
                                      connectivity_type TEXT NOT NULL,
                                      created_at TIMESTAMPTZ DEFAULT NOW(),
                                      archived_at TIMESTAMPTZ DEFAULT NULL,
@@ -60,7 +60,7 @@ CREATE TABLE IF NOT EXISTS mouse (
 
 CREATE TABLE IF NOT EXISTS hard_disks (
                                          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                                         asset_id UUID UNIQUE REFERENCES assets(id) ON DELETE CASCADE,
+                                         asset_id UUID UNIQUE REFERENCES assets(id) ,
                                          storage_capacity TEXT NOT NULL,
                                          created_at TIMESTAMPTZ DEFAULT NOW(),
                                          archived_at TIMESTAMPTZ DEFAULT NULL,
@@ -70,7 +70,7 @@ CREATE TABLE IF NOT EXISTS hard_disks (
 
 CREATE TABLE IF NOT EXISTS pendrives (
                                          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                                         asset_id UUID UNIQUE REFERENCES assets(id) ON DELETE CASCADE,
+                                         asset_id UUID UNIQUE REFERENCES assets(id) ,
                                          storage_capacity TEXT NOT NULL,
                                          created_at TIMESTAMPTZ DEFAULT NOW(),
                                          archived_at TIMESTAMPTZ DEFAULT NULL,
@@ -80,7 +80,7 @@ CREATE TABLE IF NOT EXISTS pendrives (
 
 CREATE TABLE IF NOT EXISTS mobiles (
                                        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                                       asset_id UUID UNIQUE REFERENCES assets(id) ON DELETE CASCADE,
+                                       asset_id UUID UNIQUE REFERENCES assets(id) ,
                                        imei1 TEXT NOT NULL,
                                        imei2 TEXT NOT NULL,
                                        os TEXT NOT NULL,
@@ -94,7 +94,7 @@ CREATE TABLE IF NOT EXISTS mobiles (
 
 CREATE TABLE IF NOT EXISTS sims (
                                     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                                    asset_id UUID UNIQUE REFERENCES assets(id) ON DELETE CASCADE,
+                                    asset_id UUID UNIQUE REFERENCES assets(id) ,
                                     mobile_number TEXT NOT NULL UNIQUE,
                                     network_provider TEXT NOT NULL,
                                     created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -105,8 +105,8 @@ CREATE TABLE IF NOT EXISTS sims (
 
 CREATE TABLE IF NOT EXISTS asset_employee_history (
                                                       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                                                      employee_id UUID REFERENCES employees(id) ON DELETE SET NULL,
-                                                      asset_id UUID REFERENCES assets(id) ON DELETE SET NULL,
+                                                      employee_id UUID REFERENCES employees(id) ,
+                                                      asset_id UUID REFERENCES assets(id) ,
                                                       assigned_date DATE,
                                                       return_date DATE,
                                                       status asset_history_status,
@@ -117,13 +117,12 @@ CREATE TABLE IF NOT EXISTS asset_employee_history (
 
 CREATE TABLE IF NOT EXISTS asset_history (
                                              id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                                             asset_id UUID REFERENCES assets(id) ON DELETE CASCADE,
+                                             asset_id UUID REFERENCES assets(id) ,
                                              old_status asset_status,
                                              new_status asset_status NOT NULL,
-                                             employee_id UUID REFERENCES employees(id), -- employee asset was assigned to or retrieved from (if applicable)
-                                             performed_by UUID REFERENCES employees(id), -- admin/manager who did the action
+                                             employee_id UUID REFERENCES employees(id),
+                                             performed_by UUID REFERENCES employees(id),
                                              performed_at TIMESTAMPTZ DEFAULT NOW()
 );
-
 
 CREATE INDEX IF NOT EXISTS idx_employees_email ON employees(email) WHERE archived_at IS NULL;

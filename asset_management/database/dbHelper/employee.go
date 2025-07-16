@@ -4,6 +4,10 @@ import (
 	"asset_management/database"
 	"asset_management/models"
 	"database/sql"
+	"fmt"
+	"github.com/jmoiron/sqlx"
+	"github.com/lib/pq"
+	"log"
 )
 
 func IsEmployeeExists(email string) (bool, error) {
@@ -60,36 +64,74 @@ func EmployeeTimeline(employeeID string) ([]models.EmployeeTimelineResponse, err
 }
 
 func EmployeeDetails(employeeID string) (models.EmployeeDetailsResponse, []models.EmployeeAssetResponse, error) {
-	const infoQuery = `SELECT name, email, phone_no, type, role FROM employees WHERE id = $1`
+	var emp models.EmployeeDetailsResponse
+	var assets []models.EmployeeAssetResponse
 
-	var info models.EmployeeDetailsResponse
-	if err := database.Asset.Get(&info, infoQuery, employeeID); err != nil {
-		return info, nil, err
+	query1 := `SELECT name, email, phone_no, type, role FROM employees WHERE id = $1`
+	if err := database.Asset.Get(&emp, query1, employeeID); err != nil {
+		return emp, nil, err
 	}
 
-	const assetQuery = `
-		SELECT a.id as asset_id, a.model, a.asset_type, a.serial_no
+	query2 := `
+		SELECT a.id AS asset_id, a.model, a.asset_type, a.serial_no
 		FROM assets a
-		JOIN asset_employee_history h ON a.id = h.asset_id
-		WHERE h.employee_id = $1 AND h.status = 'assigned' AND h.return_date IS NULL
+		INNER JOIN asset_employee_history h ON h.asset_id = a.id
+		WHERE h.employee_id = $1
+		  AND h.status = 'assigned'
+		  AND h.return_date IS NULL
 	`
-
-	var assets []models.EmployeeAssetResponse
-	err := database.Asset.Select(&assets, assetQuery, employeeID)
-	return info, assets, err
+	err := database.Asset.Select(&assets, query2, employeeID)
+	return emp, assets, err
 }
 
-func ListAllEmployees(page int, limit int) ([]models.EmployeeListResponse, error) {
-	const query = `
+func ListEmployees(emp models.ListEmployees, page int, limit int) ([]models.EmployeeListResponse, error) {
+	query := `
 		SELECT id, name, email, phone_no, type, role
 		FROM employees
 		WHERE archived_at IS NULL
-		ORDER BY created_at DESC
-		LIMIT $1 OFFSET $2
 	`
+	idx := 1
+	var args []any
+
+	if emp.SearchText != "" {
+		pattern := "%" + emp.SearchText + "%"
+		query += fmt.Sprintf(` AND (
+             name ILIKE $%[1]d OR 
+             phone_no ILIKE $%[1]d OR 
+             email ILIKE $%[1]d)`, idx)
+		args = append(args, pattern)
+		idx++
+	}
+
+	if len(emp.Types) > 0 {
+		query += fmt.Sprintf(" AND type::text = ANY($%d)", idx)
+		args = append(args, pq.Array(emp.Types))
+		idx++
+	}
+
+	if len(emp.Roles) > 0 {
+		query += fmt.Sprintf(" AND role::text = ANY($%d)", idx)
+		args = append(args, pq.Array(emp.Roles))
+		idx++
+	}
 
 	offset := (page - 1) * limit
+	query += fmt.Sprintf(" ORDER BY created_at DESC LIMIT $%d OFFSET $%d", idx, idx+1)
+	args = append(args, limit, offset)
+
+	log.Println("SQL:", query)
+	log.Println("ARGS:", args)
+
 	var employees []models.EmployeeListResponse
-	err := database.Asset.Select(&employees, query, limit, offset)
+	err := database.Asset.Select(&employees, query, args...)
 	return employees, err
+}
+
+func ArchiveEmployee(tx *sqlx.Tx, employeeID string) error {
+	const q = `UPDATE employees
+		SET    archived_at = NOW()
+		WHERE  id = $1;
+		`
+	_, err := tx.Exec(q, employeeID)
+	return err
 }
