@@ -22,11 +22,13 @@ func AssetStats(w http.ResponseWriter, _ *http.Request) {
 }
 
 func EmployeeDashboard(w http.ResponseWriter, r *http.Request) {
-	empID := r.URL.Query().Get("id")
-	if empID == "" {
-		http.Error(w, "employeeId is required", http.StatusBadRequest)
+	claims, ok := utils.GetClaims(r)
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
+
+	empID := claims.UserID
 
 	tx, err := database.Asset.Beginx()
 	if err != nil {

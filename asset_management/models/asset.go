@@ -138,19 +138,9 @@ type SIM struct {
 	UpdatedBy       string     `json:"updatedBy" db:"updated_by"`
 }
 
-type AssetSearchResponse struct {
-	Brand         string `json:"brand"`
-	Model         string `json:"model"`
-	AssetType     string `json:"assetType" db:"asset_type"`
-	SerialNo      string `json:"serialNo" db:"serial_no"`
-	AssetStatus   string `json:"assetStatus" db:"asset_status"`
-	OwnedBy       string `json:"ownedBt" db:"owned_by"`
-	PurchasedDate string `json:"purchasedDate" db:"purchased_date"`
-}
-
 type ListAssets struct {
 	SearchText  string   `json:"searchText"`
 	AssetTypes  []string `json:"assetTypes"`
 	AssetStatus []string `json:"assetStatus"`
-	OwnedBy     string   `json:"ownedBy"`
+	OwnedBy     []string `json:"ownedBy"`
 }

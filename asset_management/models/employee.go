@@ -27,21 +27,6 @@ type Employee struct {
 	CreatedBy string `json:"createdBy" db:"created_by"`
 }
 
-type EmployeeSearchResponse struct {
-	Name    string  `json:"name"`
-	Email   string  `json:"email"`
-	PhoneNo *string `json:"phoneNo" db:"phone_no"`
-	Type    string  `json:"type"`
-	Role    string  `json:"role"`
-}
-
-type AssignRequest struct {
-	EmployeeID  string `json:"employeeId" db:"employee_id"`
-	AssetID     string `json:"assetId" db:"asset_id"`
-	Status      string `json:"status" db:"status"`
-	PerformedBy string `json:"performedBy" db:"performed_by"`
-}
-
 type EmployeeListResponse struct {
 	ID      string  `json:"id" db:"id"`
 	Name    string  `json:"name" db:"name"`

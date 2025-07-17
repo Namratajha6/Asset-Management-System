@@ -13,7 +13,7 @@ import (
 
 func IsAssetExists(serialNo string) (bool, error) {
 	var id string
-	err := database.Asset.Get(&id, `SELECT id FROM assets WHERE serial_no = $1`, serialNo)
+	err := database.Asset.Get(&id, `SELECT id FROM assets WHERE serial_no = $1 AND archived_at IS NULL`, serialNo)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return false, nil

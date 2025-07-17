@@ -12,7 +12,7 @@ import (
 
 func IsEmployeeExists(email string) (bool, error) {
 	var id string
-	err := database.Asset.Get(&id, `SELECT id FROM employees WHERE email = $1`, email)
+	err := database.Asset.Get(&id, `SELECT id FROM employees WHERE email = $1 AND archived_at IS NULL`, email)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return false, nil

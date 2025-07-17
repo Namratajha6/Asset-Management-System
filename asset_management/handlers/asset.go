@@ -410,12 +410,11 @@ func ChangeAssetStatus(w http.ResponseWriter, r *http.Request) {
 func ListAllAssets(w http.ResponseWriter, r *http.Request) {
 	page, limit := parsePageLimit(r)
 	var req models.ListAssets
-	err := utils.JSON.NewDecoder(r.Body).Decode(&req)
-	if err != nil {
+	req.AssetTypes = utils.ParseCommaSeparatedParam(r, "assetTypes")
+	req.AssetStatus = utils.ParseCommaSeparatedParam(r, "assetStatus")
+	req.OwnedBy = utils.ParseCommaSeparatedParam(r, "ownedBy")
+	req.SearchText = r.URL.Query().Get("search")
 
-		http.Error(w, "invalid request", http.StatusBadRequest)
-		return
-	}
 	log.Printf("DEBUG  AssetTypes = %#v\n", req.AssetTypes)
 
 	assets, err := dbHelper.ListAssets(req, page, limit)

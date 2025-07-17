@@ -164,22 +164,20 @@ func Login(w http.ResponseWriter, r *http.Request) {
 func ListEmployees(w http.ResponseWriter, r *http.Request) {
 	var req models.ListEmployees
 
-	err := utils.JSON.NewDecoder(r.Body).Decode(&req)
-	if err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
-		return
-	}
+	req.Types = utils.ParseCommaSeparatedParam(r, "types")
+	req.Roles = utils.ParseCommaSeparatedParam(r, "roles")
+	req.SearchText = r.URL.Query().Get("search")
 
 	page, limit := parsePageLimit(r)
 
-	emps, err := dbHelper.ListEmployees(req, page, limit)
+	emp, err := dbHelper.ListEmployees(req, page, limit)
 	if err != nil {
 		log.Println(err.Error())
 		http.Error(w, "failed to fetch employees", http.StatusInternalServerError)
 		return
 	}
 
-	_ = utils.JSON.NewEncoder(w).Encode(map[string]any{"employees": emps})
+	_ = utils.JSON.NewEncoder(w).Encode(map[string]any{"employees": emp})
 }
 
 func EmployeeDetails(w http.ResponseWriter, r *http.Request) {
